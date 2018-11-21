@@ -1,0 +1,85 @@
+sep-16 revised, a 16 bit RISCy processor
+
+Idea: 16 Bit Word, 15 Bit Address. Each Op starting with a "0" is
+an immediate address. Three principal op types:
+1. Load immediate 15 Bit sign extended
+2. Alu op reg/reg
+3. Mem access
+
+16 Registers, all 16 bit
+R0 is always 0, R1 ... R6 user regs, R7 SP,
+R8 ... R10 extended regs
+R11(MQ) Math, R12(LNK) Link, R13(AR) Addr, R14(FR) Flags,  R15 PC
+Flags: zncv xxxx xxxx xxxx: Zero, Negative, Carry, Overflow + 12 User Flags
+
+0 xxx xxxx xxxx xxxx: LDA: Load address, AR <- x, sign extended
+
+10 0 ooo e aaa bbb ccc: Alu Op: Ra <- Rb op Rc
+
+10 1 cccc e aaaa bbbb: ARC: dd register conditional
+        if cond(c) Ra <- Ra + Rb (e: Ra <- Ra + b (sign ext.))
+
+11 0 aaaa e xxxx xxxx: LDR: Load register: Ra <- Mem[AR + x] (e: Mem[SP + x])
+11 1 aaaa e xxxx xxxx: STR: Store register: Mem[AR + x] <- Ra (e: Mem[SP + x])
+
+e: Extended operation: ADD, SUB: set carry bit on op; ...
+
+ooo: Alu ops a <- b op c:
+
+000 MOV 10 0 000 e n aaaa bbbb: Ra <- Rb (e: swap, n: negate)
+
+001 AND (e: and negate)
+010 xOR (e: decides IOR or XOR)
+011 ADD (e: with carry)
+100 SUB (e: with carry)
+101 LSL (e: shift in carry) Ra <- Rb << c (e: | carry)
+110 ASR (e: ROR) Ra <- Rb[15:0] >> c (e: Ra <- Rb ror c)
+
+111 MVE 10 0 111 aa bbbb cccc: R(a+11) <- Rb + c
+
+How? OPR special ops:
+        negate, complement (neg. + inc), ...?
+
+Condition codes (val x, code xx, desc, flags):
+
+0000 MI         minus (negative)   N
+0001 EQ         equal (zero)       Z
+0010 CS         carry set (lower)  C
+0011 VS         overflow set       V
+0100 LS         lower or same      ~C|Z
+0101 LT         less than          N!=V
+0110 LE         less or equal      (N!=V)|Z
+0111 AW         always             true
+1000 PL         plus (positive)    ~N
+1001 NE         not equal          ~Z
+1010 CC         carry clear        ~C
+1011 VC         overflow clear     ~V
+1100 HI         higher             ~(~C|Z)
+1101 GE         greater or equal   ~(N!=V)
+1110 GT         greater than       ~((N!=V)|Z)
+1111 NV         never              false
+
+Classic Ops equivalent:
+
+Jump/Branch:
+Jump abs: LDA x; MOV PC, AR => PC <- x
+Jump rel: LDA x; ARC AW, PC, AR => PC <- PC + x
+Jump rel short: ARCE AW, PC, n => PC <- PC + n (n: -8..0..7)
+
+Branch on conition:
+Branch rel: LDA x; ARC c, PC, AR => PC <- PC + x if cond(c)
+
+Branch & Link
+        MVE LNK, PC, 2 ;  PC points to next instr, +2 points to NXT
+        LDA x => AR <- x
+        ARC AW, PC, AR => PC <- PC + AR
+    NXT: ...
+
+Branch & Link Conditional
+        MVE LNK, PC, 2 ; PC point to next instr, +2 points to NXT
+        LDA x => AR <- x
+        ARC c, PC, AR => PC <- PC + AR if cond(c)
+    NXT: ...
+
+Return:
+        MVE PC, LNK, 0 => PC <- LNK
