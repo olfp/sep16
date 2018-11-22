@@ -1,0 +1,92 @@
+sep-16 revised, a 16 bit RISCy processor
+
+Idea: 16 Bit Word, 15 Bit Address. Each Op starting with a "0" is
+an immediate address. Three principal op types:
+1. Load immediate 15 Bit sign extended
+2. Alu op reg/reg
+3. Mem access
+
+16 Registers, all 16 bit
+R0 is always 0, R1 ... R9 User Regs, R10 SP,
+R11(LNK) Link, R12(MQ) Math, R13(AR) Addr, R14(FR) Flags,  R15 PC
+Flags: zncv xxxx xxxx xxxx: Zero, Negative, Carry, Overflow + 12 User Flags
+
+0 xxx xxxx xxxx xxxx: LDA: Load address, AR <- x, sign extended
+
+10 m aaaa oooo e bbbb: Alu Op: Ra <- Ra op Rb
+
+11 d aaaa e xxxx xxxx Memory Access:
+11 0 aaaa e xxxx xxxx: LDR: Load register: Ra <- Mem[AR + x] (e: Mem[SP])
+11 1 aaaa e xxxx xxxx: STR: Store register: Mem[AR + x] <- Ra (e: Mem[SP])
+
+m: mode
+ 0: alu op: Ra <- Ra op Rb
+ 1: ARC: Add register conditional
+     Ra <- Ra + Rb if cond(o)
+     e: immediate: Ra <- Ra + b if(cond(o)
+
+e: Extended operation: ADD, SUB: set carry bit on op; ...
+
+d: Direction 0: Load, 1: Save
+
+oooo: Alu ops a <- a op b:
+
+0000 AND (e: and negate)
+0001 xOR(e: decides IOR or XOR)
+0010 ADD (e: with carry)
+0011 SUB (e: with carry)
+0100 LSL (e: shift in carry) Ra <- Ra << b (e: | carry)
+0101 ASR (e: ROR) Ra <- Ra[15:0] >> b (e: Ra <- Ra ror b)
+0110 ADI Ra <- Ra + e+b (sign extended)
+0111 NOT Ra <- ~Rb (e: COM Ra <- -Rb (aka ~Rb + 1))
+1000 MUL MQ, Ra <- Ra x Rb (signed multiplication, high result in MQ, e: unsigned)
+1001 DIV Ra, MQ <- Rb / Rc (signed division, remainder in MQ, e: unsigned)
+1010 MOV Ra <- Rb (e: swap bytes)
+1100 LNK LNK<- PC + Rb (e: LNK <- PC + b (sign extended))
+1101
+1110
+1111
+
+Condition codes (val x, code xx, desc, flags):
+
+0000 MI         minus (negative)   N
+0001 EQ         equal (zero)       Z
+0010 CS         carry set (lower)  C
+0011 VS         overflow set       V
+0100 LS         lower or same      ~C|Z
+0101 LT         less than          N!=V
+0110 LE         less or equal      (N!=V)|Z
+0111 '', R,C    always             true
+1000 PL         plus (positive)    ~N
+1001 NE         not equal          ~Z
+1010 CC         carry clear        ~C
+1011 VC         overflow clear     ~V
+1100 HI         higher             ~(~C|Z)
+1101 GE         greater or equal   ~(N!=V)
+1110 GT         greater than       ~((N!=V)|Z)
+1111 NV         never              false
+
+Classic Ops equivalent:
+
+Jump/Branch:
+Jump abs: LDA x; MOV PC, AR => PC <- x
+Jump rel: LDA x; ADD PC, AR => PC <- PC + x
+Jump rel short: ADI 7, n => PC <- PC + n (n: -16..0..15)
+
+Branch on conition:
+Branch rel: LDA x; ARC c, PC, AR => PC <- PC + x if cond(c)
+
+Branch & Link
+         LNKE 3 => LNK <- PC + 2 ; PC point to next instr, +2 points to NXT
+         LDA x => AR <- x
+         ADD PC, AR => PC <- PC + AR
+    NXT: ...
+
+Branch & Link Conditional
+         LNKE 3 => LNK <- PC + 2 ; PC point to next instr, +2 points to NXT
+         LDA x => AR <- x
+         ARC c, PC, AR => PC <- PC + AR if cond(c)
+    NXT: ...
+
+Return:
+        MOV PC, LNK => PC <- LNK
