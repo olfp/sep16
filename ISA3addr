@@ -7,26 +7,34 @@ an immediate address. Three principal op types:
 3. Mem access
 
 16 Registers, all 16 bit
-R0 is always 0, R1 ... R6 user regs, R7 SP,
-R8 ... R10 extended regs
-R11(MQ) Math, R12(LNK) Link, R13(AR) Addr, R14(FR) Flags,  R15 PC
-Flags: zncv xxxx xxxx xxxx: Zero, Negative, Carry, Overflow + 12 User Flags
+R0 is always 0
+R1 ... R7 user regs,
+R8 ... R10 extended user regs
+R11 Flags(FR), R12 Addr(AR), R13 Stack Pointer(SP), R14 Link(LR), R15 Program counter(PC)
+Flags: zncv xxxx xxxx xxxx: Zero, Negative, Carry, Overflow
 
 0 xxx xxxx xxxx xxxx: LDA: Load address, AR <- x, sign extended
 
-10 0 ooo e aaa bbb ccc: Alu Op: Ra <- Rb op Rc
+10 0 000 e n aaaa bbbb: MOV: Ra <- Rb (e: increment, n: negate)
+10 0 ooo e aaa bbb ccc: 0 < o < 7: Alu Op: Ra <- Rb op Rc
+10 0 111 e ooo aaa bbb: Op immedite monadic: Ra <- Ra op bbb (unsigned) (e: AR << b)
 
-10 1 cccc e aaaa bbbb: ARC: dd register conditional
-        if cond(c) Ra <- Ra + Rb (e: Ra <- Ra + b (sign ext.))
+10 1 cccc e aaaa bbbb: ARC: add to register conditional
+  if c=1111 Ra <- PC + Rb (e: Ra <- PC + b (sign ext.))
+  Link(LNK) is ARC NV, LR, offset (offset is 1 for short, 2 for long branch)
+  if cond(c) Ra <- Ra + Rb (e: Ra <- Ra + b (sign ext.))
+  Long BRAnch is ARC PC, AE; short is ARCE PC, offset
 
-11 0 aaaa e xxxx xxxx: LDR: Load register: Ra <- Mem[AR + x] (e: Mem[SP + x])
-11 1 aaaa e xxxx xxxx: STR: Store register: Mem[AR + x] <- Ra (e: Mem[SP + x])
+11 0 aaaa e xxxx xxxx: LDR: Load register indexed: Ra <- Mem[AR + x] (e: Mem[SP + x])
+11 1 aaaa e xxxx xxxx: STR: Store register indexed: Mem[AR + x] <- Ra (e: Mem[SP + x])
 
 e: Extended operation: ADD, SUB: set carry bit on op; ...
 
 ooo: Alu ops a <- b op c:
 
-000 MOV 10 0 000 e n aaaa bbbb: Ra <- Rb (e: swap, n: negate)
+000 MOV 10 0 000 e n aaaa bbbb: Ra <- Rb (e: increment, n: negate)
+  NEGate is MOVN Ra, Rb
+  COMplement is MOVNE Ra, Rb
 
 001 AND (e: and negate)
 010 xOR (e: decides IOR or XOR)
@@ -35,10 +43,8 @@ ooo: Alu ops a <- b op c:
 101 LSL (e: shift in carry) Ra <- Rb << c (e: | carry)
 110 ASR (e: ROR) Ra <- Rb[15:0] >> c (e: Ra <- Rb ror c)
 
-111 MVE 10 0 111 aa bbbb cccc: R(a+11) <- Rb + c
-
-How? OPR special ops:
-        negate, complement (neg. + inc), ...?
+111 IOP  Ra <- Ra op bbb (unsigned) (e: AR << b)
+    
 
 Condition codes (val x, code xx, desc, flags):
 
@@ -61,6 +67,10 @@ Condition codes (val x, code xx, desc, flags):
 
 Classic Ops equivalent:
 
+Test Bit(s): LDA m; MOV Rb, AR; AND, 0, Ra, Rb => Z if no bits in m are set in Ra
+Test msb: ADD Ra, Ra, 0 => N if msb set in Ra
+Compare: SUB 0, Ra, Rb => Flags set, nothing else altered (dest is R0)
+
 Jump/Branch:
 Jump abs: LDA x; MOV PC, AR => PC <- x
 Jump rel: LDA x; ARC AW, PC, AR => PC <- PC + x
@@ -69,17 +79,17 @@ Jump rel short: ARCE AW, PC, n => PC <- PC + n (n: -8..0..7)
 Branch on conition:
 Branch rel: LDA x; ARC c, PC, AR => PC <- PC + x if cond(c)
 
-Branch & Link
-        MVE LNK, PC, 2 ;  PC points to next instr, +2 points to NXT
+Branch & Link:
+        ARC NV, LR, 2 => LR <- PC + 2 ; make LR point to NXT
         LDA x => AR <- x
         ARC AW, PC, AR => PC <- PC + AR
     NXT: ...
 
-Branch & Link Conditional
-        MVE LNK, PC, 2 ; PC point to next instr, +2 points to NXT
+Branch & Link Conditional:
+        ARC NV, LR, 2 => LR <- PC + 2 ; make LR point to NXT
         LDA x => AR <- x
         ARC c, PC, AR => PC <- PC + AR if cond(c)
     NXT: ...
 
 Return:
-        MVE PC, LNK, 0 => PC <- LNK
+        MOV PC, LR => PC <- LR
