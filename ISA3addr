@@ -17,7 +17,7 @@ Flags: zncv xxxx xxxx xxxx: Zero, Negative, Carry, Overflow
 
 10 0 000 e n aaaa bbbb: MOV: Ra <- Rb (e: increment, n: negate)
 10 0 ooo e aaa bbb ccc: 0 < o < 7: Alu Op: Ra <- Rb op Rc
-10 0 111 e ooo aaa bbb: Op immedite monadic: Ra <- Ra op bbb (unsigned) (e: AR << b)
+10 0 111 eo aaaa bbbb: Op immedite monadic: Ra <- Ra eo bbbb (unsigned)
 
 10 1 cccc e aaaa bbbb: ARC: add to register conditional
   if c=1111 Ra <- PC + Rb (e: Ra <- PC + b (sign ext.))
@@ -32,38 +32,40 @@ e: Extended operation: ADD, SUB: set carry bit on op; ...
 
 ooo: Alu ops a <- b op c:
 
-000 MOV 10 0 000 e n aaaa bbbb: Ra <- Rb (e: increment, n: negate)
-  NEGate is MOVN Ra, Rb
-  COMplement is MOVNE Ra, Rb
+000 MOV 10 0 000 eo aaaa bbbb: Ra <- Rb (eo=01: invert, eo=10: negate, eo=11: swap bytes)
+  NOT is MVN Ra, Rb
+  COMplement is MVM Ra, Rb
+  SWB is MVS Ra, Rb
 
 001 AND (e: and negate)
 010 xOR (e: decides IOR or XOR)
 011 ADD (e: with carry)
 100 SUB (e: with carry)
 101 LSL (e: shift in carry) Ra <- Rb << c (e: | carry)
-110 ASR (e: ROR) Ra <- Rb[15:0] >> c (e: Ra <- Rb ror c)
+110 ASR (e: ROR) Ra <- Rb[14:0] >> c (e: Ra <- Rb ror c)
 
-111 IOP  Ra <- Ra op bbb (unsigned) (e: AR << b)
+111 IOP 10 0 111 eo aaaa bbbb: alu op immediate op:eo
+        Ra <- Ra op bbbb (unsigned)
     
 
 Condition codes (val x, code xx, desc, flags):
 
-0000 MI         minus (negative)   N
-0001 EQ         equal (zero)       Z
-0010 CS         carry set (lower)  C
-0011 VS         overflow set       V
-0100 LS         lower or same      ~C|Z
-0101 LT         less than          N!=V
-0110 LE         less or equal      (N!=V)|Z
-0111 AW         always             true
-1000 PL         plus (positive)    ~N
-1001 NE         not equal          ~Z
-1010 CC         carry clear        ~C
-1011 VC         overflow clear     ~V
-1100 HI         higher             ~(~C|Z)
-1101 GE         greater or equal   ~(N!=V)
-1110 GT         greater than       ~((N!=V)|Z)
-1111 NV         never              false
+0000, MI, minus (negative)   ,N
+0001, EQ, equal (zero)       ,Z
+0010, CS, carry set (lower)  ,C
+0011, VS, overflow set       ,V
+0100, LS, lower or same      ,~C|Z
+0101, LT, less than          ,N!=V
+0110, LE, less or equal      ,(N!=V)|Z
+0111, AW, always             ,true
+1000, PL, plus (positive)    ,~N
+1001, NE, not equal          ,~Z
+1010, CC, carry clear        ,~C
+1011, VC, overflow clear     ,~V
+1100, HI, higher             ,~(~C|Z)
+1101, GE, greater or equal   ,~(N!=V)
+1110, GT, greater than       ,~((N!=V)|Z)
+1111, NV, never              ,false
 
 Classic Ops equivalent:
 
